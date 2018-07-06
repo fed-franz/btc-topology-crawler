@@ -12,9 +12,16 @@ webapi.getFromApi(api_url, function (error, result) {
     // console.log('Body: ', JSON.stringify(result, null, 2));
 
     //Get nodes IP
-    var nodes = Object.keys(result.nodes)
-    for (var i=0; i<nodes.length; i++){
-      console.log(nodes[i]);
-    }
+    for(var node in result.nodes)
+      console.log(node);
+
+    //Using graph lib
+    //add addresses as nodes
+
+    //Using btc lib
+    //ask getpeers for each node
+    //add nodes if not in the list
+    //create edges
+
 
   })

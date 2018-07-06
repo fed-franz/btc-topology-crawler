@@ -1,0 +1,13 @@
+RESOURCES
+- APIs
+  - https://bitnodes.earn.com/api/
+
+STRATEGY 1
+methodology involves sending getaddr messages recursively to find all the reachable nodes in the network, starting from a set of seed nodes
+
+STRATEGY 2
+Get list of nodes from BITNODES
+Construct connections
+- getpeers from each node in the list ?
+  - repeat multiple times? each request might return different nodes
+- Can we use data propagation data?

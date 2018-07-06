@@ -1,3 +1,7 @@
+REQUIREMENTS
+
+npm install request
+
 RESOURCES
 - APIs
   - https://bitnodes.earn.com/api/

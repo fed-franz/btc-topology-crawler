@@ -5,86 +5,125 @@
 const webapi = require('./webapi')
 var net = require('net')
 var bp = require('bitcoin-protocol')
+var Graph = require('graphlib').Graph;
+
+var g = new Graph();
 
 // This API returns the latest snapshot of know active nodes on the Bitcoin network
 var api_url = "https://bitnodes.earn.com/api/v1/snapshots/latest"
-
 webapi.getFromApi(api_url, function (error, result) {
     if (error) console.log(error);
+    console.log("Nodes retrieved: "+result.total_nodes);
 
-    // console.log('Body: ', JSON.stringify(result, null, 2));
+    var nodeList = []
 
-    //Get nodes IP
-    // console.log(result.total_nodes);
-    // for(var node in result.nodes)
-    //   console.log(node);
+    //Add nodes to the graph
+    for(var node in result.nodes){
+      // console.log(node);
+      //Add node to graph
+      g.setNode(node)
+      nodeList.push(node)
+    } //for node in result
 
-    //Using btc lib
-    //ask getpeers for each node
-    //add nodes if not in the list
-    //create edges
-    var decoder = bp.createDecodeStream()
-    decoder.on('data', function (message) {
-        if(message.command === 'addr'){
-          console.log("NEW addr message ("+message.payload.length+")");
-          for(var i in message.payload){
-            var peer = message.payload[i]
-            console.log(peer.address);
-          }
-          // for(var i=0; i < peers.length; i++)
-          //   console.log(peers[i])
-        }
+    // console.log('nodeList: '+nodeList);
 
+    //For each node in the list...
+    nodeList.forEach(function(n){
+      // console.log("NODE: "+n);
+
+      //Parse IP and port
+      var ip, port
+      if(n[0]=='['){
+        ip = (n.split(']')[0]).split('[')[1]
+        port = n.split(']:')[1]
       }
-    )
+      else{
+        ip = n.split(':')[0]
+        port = n.split(':')[1]
+      }
+      // console.log("IP:"+ip+" port:"+port);
 
-    var encoder = bp.createEncodeStream()
+      if(net.isIPv4(ip)){ //TEMP we have problems with IPv6 addresses...
+        var socket = new net.Socket()
+        // Connect to node
+        socket.connect(port, ip, function () { //nodeList[0]
+          console.log("Connected to "+ip);
+          // if(error){ console.log(error); return error}
+          /**/
+          var encoder = bp.createEncodeStream()
+          //Handle received peers
+          var decoder = bp.createDecodeStream()
 
-    var socket = net.connect(8333, '72.11.174.71', function () {
-  socket.pipe(decoder)
-  encoder.pipe(socket)
+          decoder.on('data', function (message) {
+            if(message.command == 'addr' && message.payload.length > 1){ //message.payload[0].address != ip){
+              console.log("NEW addr message ("+message.payload.length+")");
+              for(var i in message.payload){
+                var peer = message.payload[i]
+                console.log("Node "+n+" --> "+peer.address+":"+peer.port);
+              }
 
-  encoder.write({
-    magic: 0xd9b4bef9,
-    command: 'version',
-    payload: {
-      version: 70012,
-      services: Buffer(8).fill(0),
-      timestamp: Math.round(Date.now() / 1000),
-      receiverAddress: {
-        services: Buffer('0100000000000000', 'hex'),
-        address: '0.0.0.0',
-        port: 8333
-      },
-      senderAddress: {
-        services: Buffer(8).fill(0),
-        address: '0.0.0.0',
-        port: 8333
-      },
-      nonce: Buffer(8).fill(123),
-      userAgent: 'foobar',
-      startHeight: 0,
-      relay: true
-    }
-  })
+              // Close connection when 'addr' is received
+              socket.destroy();
+            }//if('addr')
+          })//decoder.on('data')
 
-  encoder.write({
-    magic: 0xd9b4bef9,
-    command: 'verack',
-    payload: ''
-  })
+          socket.pipe(decoder)
+          encoder.pipe(socket)
 
-  encoder.write({
-    magic: 0xd9b4bef9,
-    command: 'getaddr',
-    payload: ''
-  })
-})
+          /* Send 'version' message */
+          encoder.write({
+              magic: 0xd9b4bef9,
+              command: 'version',
+              payload: {
+                version: 70012,
+                services: Buffer.alloc(8).fill(0),
+                timestamp: Math.round(Date.now() / 1000),
+                receiverAddress: {
+                  services: Buffer.from('0100000000000000', 'hex'),
+                  address: '0.0.0.0',
+                  port: 8333
+                },
+                senderAddress: {
+                  services: Buffer.alloc(8).fill(0),
+                  address: '0.0.0.0',
+                  port: 8333
+                },
+                nonce: Buffer.alloc(8).fill(123),
+                userAgent: 'foobar',
+                startHeight: 0,
+                relay: true
+              }//payload
+          })
+
+      encoder.write({
+      magic: 0xd9b4bef9,
+      command: 'verack',
+      payload: ''
+      })
+
+      encoder.write({
+      magic: 0xd9b4bef9,
+      command: 'getaddr',
+      payload: ''
+      })
+      /**/
+        });
+
+        socket.on('error', function(ex) {
+          console.log("handled error");
+          console.log(ex);
+          //TODO Mark node as offline
+          socket.destroy();
+        });
+        // })//net.connect
+        //End of getaddr request
+      //Using graph lib
+      //add addresses as nodes
+      //add connections as edges
+
+    }//isIPv4
+    }) //nodeList.forEach
 
 
 
-    //Using graph lib
-    //add addresses as nodes
-    //add connections as edges
-
-  })
+  }) //getFromApi()

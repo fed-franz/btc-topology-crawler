@@ -35,7 +35,7 @@ function getFromApi (api_url, callback) {
         if (typeof body === 'string')
             body = JSON.parse(body)
 
-        console.log('Status:', response.statusCode);
+        // console.log('Status:', response.statusCode);
         return callback(null, body);
     });
 }

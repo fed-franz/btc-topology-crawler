@@ -15,3 +15,13 @@ Construct connections
 - getpeers from each node in the list ?
   - repeat multiple times? each request might return different nodes
 - Can we use data propagation data?
+
+ALGORITHM
+1) Get nodes from Bitnodes
+2) Add nodes to G
+3) For each node in G
+  3.1) Connect; Ask peers (getaddr)
+  3.2) For each received addr
+        3.2.1) If addr not in G
+          - add addr to G
+        3.2.2) Add edge (node-peer)

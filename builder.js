@@ -20,14 +20,15 @@ webapi.getFromApi(api_url, function (error, result) {
     //Add nodes to the graph
     for(var node in result.nodes){
       // console.log(node);
-      //Add node to graph
       g.setNode(node)
+      //TODO Add node to graph
       nodeList.push(node)
     } //for node in result
 
     // console.log('nodeList: '+nodeList);
 
     //For each node in the list...
+    //TODO: instead of a list, use a queue and a counter (to make n requests for each address)
     nodeList.forEach(function(n){
       // console.log("NODE: "+n);
 
@@ -54,12 +55,21 @@ webapi.getFromApi(api_url, function (error, result) {
           //Handle received peers
           var decoder = bp.createDecodeStream()
 
+          decoder.on('error', function (message){
+            console.log("DECODER ERROR: "+message);
+          });
+
+          /* Handle received addresses */
           decoder.on('data', function (message) {
             if(message.command == 'addr' && message.payload.length > 1){ //message.payload[0].address != ip){
               console.log("NEW addr message ("+message.payload.length+")");
+              console.log("Node "+n+" : ");
+              // For each peer in 'addr'
               for(var i in message.payload){
                 var peer = message.payload[i]
-                console.log("Node "+n+" --> "+peer.address+":"+peer.port);
+                console.log("  "+peer.address+":"+peer.port);
+                //TODO: check if we know the node. If not, add it to G and to nodeList;
+                //Add edge between n and peer
               }
 
               // Close connection when 'addr' is received
@@ -70,7 +80,8 @@ webapi.getFromApi(api_url, function (error, result) {
           socket.pipe(decoder)
           encoder.pipe(socket)
 
-          /* Send 'version' message */
+          /* Perform handshake message */
+          // 'version' //
           encoder.write({
               magic: 0xd9b4bef9,
               command: 'version',
@@ -94,19 +105,20 @@ webapi.getFromApi(api_url, function (error, result) {
                 relay: true
               }//payload
           })
+          // 'verack' //
+          encoder.write({
+          magic: 0xd9b4bef9,
+          command: 'verack',
+          payload: ''
+          })
 
-      encoder.write({
-      magic: 0xd9b4bef9,
-      command: 'verack',
-      payload: ''
-      })
-
-      encoder.write({
-      magic: 0xd9b4bef9,
-      command: 'getaddr',
-      payload: ''
-      })
-      /**/
+          /* Request peers */
+          encoder.write({
+          magic: 0xd9b4bef9,
+          command: 'getaddr',
+          payload: ''
+          })
+          /**/
         });
 
         socket.on('error', function(ex) {

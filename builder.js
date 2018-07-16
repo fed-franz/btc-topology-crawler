@@ -21,7 +21,7 @@ webapi.getFromApi(api_url, function (error, result) {
     for(var node in result.nodes){
       // console.log(node);
       g.setNode(node)
-      //TODO Add node to graph
+      //TODO g.setNode(node.address/*ip:port*/, { counter: 0, online: true });
       nodeList.push(node)
     } //for node in result
 
@@ -62,19 +62,27 @@ webapi.getFromApi(api_url, function (error, result) {
           /* Handle received addresses */
           decoder.on('data', function (message) {
             if(message.command == 'addr' && message.payload.length > 1){ //message.payload[0].address != ip){
-              console.log("NEW addr message ("+message.payload.length+")");
-              console.log("Node "+n+" : ");
+              console.log("NEW 'addr' from n ("+message.payload.length+")");
               // For each peer in 'addr'
               for(var i in message.payload){
                 var peer = message.payload[i]
-                console.log("  "+peer.address+":"+peer.port);
-                //TODO: check if we know the node. If not, add it to G and to nodeList;
-                //Add edge between n and peer
+                var peeraddr = peer.address+":"+peer.port
+                // console.log("  "+peeraddr);
+
+                // If peer is not in G, add it
+                if(! g.hasNode(peeraddr))
+                  g.setNode(peeraddr)
+                // Add edge n <--> peer
+                g.setEdge(n, peeraddr)
               }
 
-              // Close connection when 'addr' is received
-              socket.destroy();
+              //TODO: keep track of number of "visits" to this node (how many times have we asked for peers?)
+              //g.node().counter++;
             }//if('addr')
+
+            // Close connection when 'addr' is received
+            // TODO: close only after N requests?
+            socket.destroy();
           })//decoder.on('data')
 
           socket.pipe(decoder)
@@ -119,23 +127,20 @@ webapi.getFromApi(api_url, function (error, result) {
           payload: ''
           })
           /**/
-        });
+        }); //End of getaddr request
 
+        // Handle connection errors
         socket.on('error', function(ex) {
           console.log("handled error");
           console.log(ex);
-          //TODO Mark node as offline
+          //TODO Mark node as offline/unreachable
           socket.destroy();
         });
-        // })//net.connect
-        //End of getaddr request
-      //Using graph lib
-      //add addresses as nodes
-      //add connections as edges
 
     }//isIPv4
     }) //nodeList.forEach
 
-
+// After receiving 'addr' from every node:
+console.log("DONE");
 
   }) //getFromApi()

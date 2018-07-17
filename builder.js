@@ -8,6 +8,18 @@ var bp = require('bitcoin-protocol')
 var Graph = require('graphlib').Graph;
 
 var g = new Graph();
+var connections = 0;
+
+function finalize(){
+  console.log("DONE");
+  process.exit(0);
+}
+
+function conn_dec(){
+  connections--;
+  if(connections == 0)
+    finalize();
+}
 
 // This API returns the latest snapshot of know active nodes on the Bitcoin network
 var api_url = "https://bitnodes.earn.com/api/v1/snapshots/latest"
@@ -16,6 +28,10 @@ webapi.getFromApi(api_url, function (error, result) {
     console.log("Nodes retrieved: "+result.total_nodes);
 
     var nodeList = []
+
+//TODO: add connections to array, so as to keep track of open connections and deduce when the round is over (by having no more open connections)
+
+// if(connections.length == 0)
 
     //Add nodes to the graph
     for(var node in result.nodes){
@@ -49,6 +65,7 @@ webapi.getFromApi(api_url, function (error, result) {
         // Connect to node
         socket.connect(port, ip, function () { //nodeList[0]
           console.log("Connected to "+ip);
+          connections++;
           // if(error){ console.log(error); return error}
           /**/
           var encoder = bp.createEncodeStream()
@@ -57,6 +74,7 @@ webapi.getFromApi(api_url, function (error, result) {
 
           decoder.on('error', function (message){
             console.log("DECODER ERROR: "+message);
+            socket.destroy(); conn_dec();
           });
 
           /* Handle received addresses */
@@ -82,7 +100,7 @@ webapi.getFromApi(api_url, function (error, result) {
 
             // Close connection when 'addr' is received
             // TODO: close only after N requests?
-            socket.destroy();
+            socket.destroy(); conn_dec();
           })//decoder.on('data')
 
           socket.pipe(decoder)
@@ -134,13 +152,14 @@ webapi.getFromApi(api_url, function (error, result) {
           console.log("handled error");
           console.log(ex);
           //TODO Mark node as offline/unreachable
-          socket.destroy();
+          socket.destroy(); conn_dec();
         });
 
     }//isIPv4
     }) //nodeList.forEach
 
 // After receiving 'addr' from every node:
-console.log("DONE");
+//TODO if(connections.length == 0)
+// console.log("DONE");
 
   }) //getFromApi()

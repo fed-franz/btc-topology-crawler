@@ -38,23 +38,6 @@ function handleNetEvents(events, socket, handler){
 }
 /**/
 
-function conn_dec(socket, node, callback){
-  remove(curNodes, node)
-  console.log("Closing connection to "+node+" ("+curNodes.length+")");
-  socket.end();
-  socket.destroy();
-
-  if(curNodes.length == 0){
-    if(newNodes.length > 0){
-      console.log("newNodes = "+newNodes.length);
-      if(--rounds > 0)
-        buildGraph(newNodes)
-    }
-    else
-      eventEmitter.emit('done') //TODO: replace with finalize()?
-  }
-}
-
 function sendGetAddr(encoder){
   // 'version' //
   encoder.write({
@@ -96,8 +79,23 @@ function sendGetAddr(encoder){
   /**/
 }
 
+function conn_dec(socket, node){
+  // remove(curNodes, node)
+  // console.log("Closing connection to "+node+" ("+curNodes.length+")");
+  if(!socket){
+    console.log("Removing "+node);
+  }
+  else{
+    console.log("Closing connection to "+node);
+    socket.end();
+    socket.destroy();
+  }
+  eventEmitter.emit('node')
+}
+
 function visitNode(n, callback){
   console.log("Visiting "+n);
+
   //TODO: keep track of number of "visits" to this node (how many times have we asked for peers?)
   //g.node().counter++;
 
@@ -116,7 +114,8 @@ function visitNode(n, callback){
     //TEMP we have problems with IPv6 addresses... TODO Remove this
     if(!net.isIPv4(ip)){
       console.log("Removing "+n);
-      remove(curNodes, n)
+      // remove(curNodes, n)
+      conn_dec(null, n)
     }
     else{
       // Connect to node
@@ -129,7 +128,7 @@ function visitNode(n, callback){
         //TODO Mark node as offline/unreachable
         if(e == 'error')
           g.setNode(n, false)
-        conn_dec(socket, n, callback);
+        conn_dec(socket, n);
       })
 
       socket.connect(port, ip, function () {
@@ -142,7 +141,7 @@ function visitNode(n, callback){
 
         decoder.on('error', function (message){
           console.log(curNode+" DECODER ERROR: "+message); //Unrecognized command: "encinit"
-          conn_dec(socket, curNode, callback);
+          conn_dec(socket, curNode);
         });
 
         /* Handle received addresses */
@@ -176,8 +175,7 @@ function visitNode(n, callback){
               }
 
               // Close connection when 'addr' is received
-              // TODO: close only after N requests?
-              conn_dec(socket, n, callback);
+              conn_dec(socket, n);
             }
           }//if('addr')
           else{
@@ -193,7 +191,7 @@ function visitNode(n, callback){
                 default:
                   console.log("Unexpected command from "+n+": "+message.command); //util.inspect(message, false, null)
                   //mempool, reject,
-                  conn_dec(socket, n, callback);
+                  conn_dec(socket, n);
               }
           }
         })//decoder.on('data')
@@ -211,26 +209,56 @@ function visitNode(n, callback){
 
 //TODO mv graph code into a function to be called NUM_ROUNDS times
 //TODO run it until no news nodes/edges are found
+var visiting = 0
 
-/* Main 'addr' request function */
+eventEmitter.on('node', function(){
+  visiting--;
+  console.log("Left="+visiting);
+  if(visiting == 0)
+    eventEmitter.emit('nodes')
+})
+
+function visitNodes(nodes){
+  console.log("visitNodes");
+  // console.log('visitNodes: '+util.inspect(nodes, false, null));
+
+  visiting = nodes.length
+  nodes.forEach(function(node){
+    visitNode(node)
+  })
+}
+
+const segmentSize = 10000
+var segments
+var segment
+eventEmitter.on('nodes', function(){
+  if(++segment < segments)
+    visitNodes(curNodes.slice(segmentSize*segment, segmentSize*(segment+1)));
+  else
+    eventEmitter.emit('done')
+})
+
 function buildGraph(nodes, callback){
-  console.log('buildGraph: '+util.inspect(nodes, false, null));
+  console.log("buildGraph");
+  // console.log('buildGraph: '+util.inspect(nodes, false, null));
 
+  /* Add nodes to G */
   //TODO Add 'online/offline' state
   //g.setNode("c", { k: 123 });
   //g.setNode("b", "b's value");
   //g.node("b"); => "b's value"
-
   curNodes = []
+  newNodes = []
+
   nodes.forEach(function(node){
     g.setNode(node, true)
     curNodes.push(node)
   })
 
-  newNodes = []
-  nodes.forEach(function(node){
-    visitNode(node, callback)
-  })
+  segments = Math.ceil(nodes.length / segmentSize) //# rounds needed to visit all nodes
+  segment = 0
+
+  visitNodes(nodes.slice(0, segmentSize))
 
 }//buildGraph()
 
@@ -242,19 +270,26 @@ webapi.getFromApi(api_url, function (error, result) {
     console.log("Nodes retrieved: "+result.total_nodes);
 
     // List of nodes to be queried
+    var startNodes = []
     for(var node in result.nodes){
-      newNodes.push(node)
+      startNodes.push(node)
     } //for node in result
 
     //NOTE if you want to execute something after buildGraph has done, you need to put a callback function
-    buildGraph(newNodes, function(){ //newNodes.slice(0, 100)
-      console.log("buildGraph finished");
-    })
+    buildGraph(startNodes); //newNodes.slice(0, 100)
 
   }) //getFromApi()
 
   eventEmitter.on('done', function(){
-    process.stdout.write("DONE!");
-    console.log("G: nodes="+g.nodes().length+" edges="+g.edges().length);
-    process.exit(0);
+    if(false){ //newNodes.length > 0
+      console.log("newNodes = "+newNodes.length);
+      if(--rounds > 0){
+        buildGraph(newNodes.slice(0,newNodes.length))
+      }
+    }
+    else{
+      console.log("DONE!");
+      console.log("G: nodes="+g.nodes().length+" edges="+g.edges().length);
+      process.exit(0);
+    }
   });

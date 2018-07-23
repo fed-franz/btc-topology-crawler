@@ -1,6 +1,6 @@
 REQUIREMENTS
 
-npm install request
+npm install request events
 
 RESOURCES
 - APIs
@@ -25,3 +25,19 @@ ALGORITHM
         3.2.1) If addr not in G
           - add addr to G
         3.2.2) Add edge (node-peer)
+
+
+The sequence of messages received by a peer is:
+1. version
+2. verack
+3. alert
+4. sendheaders
+5. ping
+6. addr
+7. inv (repeated...)
+
+ADDR
+{ time: 1532318765,
+  services: <Buffer 0d 00 00 00 00 00 00 00>,
+  address: '2607:f2d8:4005:d:a8a2:eeff:fee0:a859',
+  port: 8333 }

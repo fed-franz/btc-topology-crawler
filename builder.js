@@ -19,7 +19,8 @@ var eventEmitter = new EventEmitter();
 net.createServer().listen(); //Used to keep the process running
 
 var visiting = 0
-const vThreshold = 10000
+var visited = 0
+const vThreshold = 50000
 const NUM_ROUNDS = 3;
 
 // var g = new Graph();
@@ -109,7 +110,6 @@ function sendGetAddr(encoder){
 
 function endVisit(socket, node){
   visiting--;
-  console.log("Visiting="+visiting);
 
   if(!socket){
     console.log("Setting "+node+" offline");
@@ -148,7 +148,7 @@ function visitNode(n){
   else{
       // Connect to node
       var socket = new net.Socket()
-      socket.setTimeout(60000);
+      socket.setTimeout(10000);
 
       const netevents = ['error', 'end', 'timeout']
       handleNetEvents(netevents, socket, function(e, ex){
@@ -180,10 +180,10 @@ function visitNode(n){
         decoder.on('data', function (message) {
           // console.log("Message from "+n+": "+message.command);
 
-          if( message.command == 'addr'){
+          if(message.command == 'addr'){
             // var first_peer = message.payload[0].address+':'+message.payload[0].port;
             // if(first_peer != n){
-            if(message.payload.length > 1){
+            if(message.payload.length > 2){
               console.log("Received 'addr' from "+n+" ("+message.payload.length+")");
               //TEMP // if(message.payload.length == 1) console.log(" addr: "+first_peer);
               // g.setNode(n, true)
@@ -258,21 +258,22 @@ function visitNode(n){
 //TODO run it until no news nodes/edges are found
 
 function visitNext(){
-  console.log("BTCNodes: "+Object.keys(BTCNodes).length);
+  console.log("BTCNodes: "+Object.keys(BTCNodes).length+" -- "+visited);
   console.log("vNodes: "+vNodes.getLength());
-  logHeap()
+  // logHeap()
 
   //If there are no more nodes to visit, nor nodes visiting, then we are done
   if(vNodes.getLength() == 0 && visiting == 0)
-    emit('done')
+    eventEmitter.emit('done')
   else
-    while(vNodes.getLength() > 0 && visiting < vThreshold){
+    while(vNodes.getLength() > 0 && visiting <= vThreshold){
       visitNode(vNodes.dequeue())
     }
 }
 
 //When a node has done, visit the next one in queue
 eventEmitter.on('nodevisited', function(){
+  visited++
   visitNext()
 })
 

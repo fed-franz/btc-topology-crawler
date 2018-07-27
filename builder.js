@@ -26,47 +26,10 @@ const NUM_ROUNDS = 3;
 // var g = new Graph();
 var BTCNodes = {}
 var vNodes = new Queue();
-// var newNodes = 0
-// var curNodes = []
-// var connections = 0;
 var rounds = NUM_ROUNDS; //TODO make it per-node
 
-/* Helper functions */
-// function remove(array, element) {
-//     const index = array.indexOf(element);
-//
-//     if (index !== -1) {
-//         array.splice(index, 1);
-//     }
-//     // else console.log("WARN: couldn't remove "+element);
-// }
-
-function logHeap(){
-  const used = process.memoryUsage().heapTotal / 1024 / 1024;
-  console.log(`HEAP ${Math.round(used * 100) / 100} MB`);
-// console.log("TOT Size: "+require('v8').getHeapStatistics().total_available_size);
-  // const used = process.memoryUsage();
-  // for (let key in used) {
-  //   console.log(`${key} ${Math.round(used[key] / 1024 / 1024 * 100) / 100} MB`);
-  // }
-}
-
-function handleNetEvents(events, socket, handler){
-  events.forEach(function(e){
-    socket.on(e, function(ex){
-      handler(e, ex)}
-    )
-  })
-
-}
-
-Array.prototype.contains = function(element){
-    return this.indexOf(element) > -1;
-};
-/**/
-
 function sendGetAddr(encoder){
-  // 'version' //
+  // version //
   encoder.write({
       magic: 0xd9b4bef9,
       command: 'version',
@@ -90,14 +53,15 @@ function sendGetAddr(encoder){
         relay: true
       }//payload
   })
-  // 'verack' //
+
+  // verack //
   encoder.write({
   magic: 0xd9b4bef9,
   command: 'verack',
   payload: ''
   })
 
-  /* Request peers */
+  // getaddr //
   encoder.write({
   magic: 0xd9b4bef9,
   command: 'getaddr',
@@ -105,7 +69,16 @@ function sendGetAddr(encoder){
   })
 
   encoder=null
-  /**/
+}
+
+/* Set up a listener for multiple events */
+// events: []
+function handleNetEvents(events, socket, handler){
+  events.forEach(function(e){
+    socket.on(e, function(ex){
+      handler(e, ex)}
+    )
+  })
 }
 
 function endVisit(socket, node){
@@ -185,8 +158,6 @@ function visitNode(n){
             // if(first_peer != n){
             if(message.payload.length > 2){
               console.log("Received 'addr' from "+n+" ("+message.payload.length+")");
-              //TEMP // if(message.payload.length == 1) console.log(" addr: "+first_peer);
-              // g.setNode(n, true)
 
               // console.log(util.inspect(message.payload[0],false,null));
               // For each peer in 'addr'
@@ -199,27 +170,18 @@ function visitNode(n){
                     // console.log("NEW Node: "+peeraddr);
                     BTCNodes[peeraddr]={visited:false, online:undefined}
                     vNodes.enqueue(peeraddr)
-                    // newNodes++;
                   }
-                  // console.log("NEW Edge: "+n+" <--> "+peeraddr);
 
+                //TODO
                 // Add edge n <--> peer
-                // if(! g.hasEdge(n, peeraddr)){
-                //   g.setEdge(n, peeraddr);
-                // }
-                // fs.appendFile("./edges.dat", n+"<>"+peeraddr, function(err) {
-                //     if(err) {
-                //         return console.log(err);
-                //     }
-                // });
+                // console.log("NEW Edge: "+n+" <--> "+peeraddr);
               }
               }
 
               // Close connection when 'addr' is received
               BTCNodes[n].visited = true
               endVisit(socket, n);
-              encoder=null
-              decoder=null
+              encoder=null; decoder=null //TODO Can eliminate?
             }
           }//if('addr')
           else{
@@ -233,12 +195,11 @@ function visitNode(n){
                 case 'inv':
                   break;
                 default:
-                  console.log("Unexpected command from "+n+": "+message.command); //util.inspect(message, false, null)
+                  console.log("Unexpected command from "+n+": "+message.command);
                   //mempool, reject,
-                  BTCNodes[n].visited = true //TODO, handle these cases a non-visited
+                  BTCNodes[n].visited = true //TODO, handle these cases as non-visited
                   endVisit(socket, n);
-                  encoder=null
-                  decoder=null
+                  encoder=null; decoder=null
               }
           }
         })//decoder.on('data')
@@ -249,18 +210,12 @@ function visitNode(n){
         /* Connects to the node and send 'addr' */
         sendGetAddr(encoder);
       }); //End of getaddr request
-
   }//isIPv4
-
 }//visitNode
-
-//TODO mv graph code into a function to be called NUM_ROUNDS times
-//TODO run it until no news nodes/edges are found
 
 function visitNext(){
   console.log("BTCNodes: "+Object.keys(BTCNodes).length+" -- "+visited);
   console.log("vNodes: "+vNodes.getLength());
-  // logHeap()
 
   //If there are no more nodes to visit, nor nodes visiting, then we are done
   if(vNodes.getLength() == 0 && visiting == 0)
@@ -286,33 +241,20 @@ function visitNodes(){
         vNodes.enqueue(node)
     }
   }
-  // if(visiting == 0)
-  //   emit('done')
 }
-
-/*
-eventEmitter.on('nodes', function(){
-  if(++segment < segments)
-    visitNodes(curNodes.slice(vThreshold*segment, vThreshold*(segment+1)));
-  else
-    eventEmitter.emit('done')
-})
-*/
 
 function buildGraph(nodes){
   console.log("buildGraph");
   // console.log('buildGraph: '+util.inspect(nodes, false, null));
 
-  /* Add nodes to G */
-  //TODO Add 'online/offline' state
-  //g.setNode("c", { k: 123 });
-  //g.setNode("b", "b's value");
-  //g.node("b"); => "b's value"
-  // curNodes = []
-  // newNodes = 0
+  // List of nodes to be queried
+  for(var node in nodes){
+    BTCNodes[node] = {visited:false, online:undefined} //set 'visited'
+  } //for node in result
 
-  // segments = Math.ceil(nodes.length / vThreshold) //# rounds needed to visit all nodes
-  // segment = 0
+  /* Add nodes to G */
+  //g.setNode("c", { k: 123 }); //g.setNode("b", "b's value");
+  //g.node("b"); => "b's value"
 
   visitNodes()
 }//buildGraph()
@@ -323,28 +265,18 @@ webapi.getFromApi(api_url, function (error, result) {
     if (error) console.log(error);
     console.log("Nodes retrieved: "+result.total_nodes);
 
-    // List of nodes to be queried
-    // var startNodes = []
-    for(var node in result.nodes){
-      BTCNodes[node] = {visited:false, online:undefined} //set 'visited'
-    } //for node in result
+    buildGraph(result.nodes);
+}) //getFromApi()
 
-    //NOTE if you want to execute something after buildGraph has done, you need to put a callback function
-    buildGraph(); //.slice(0, startNodes.length)
-
-  }) //getFromApi()
-
-  eventEmitter.on('done', function(){
-    // if(newNodes > 0){
-    //   console.log("newNodes = "+newNodes);
-    //   if(--rounds > 0){
-    //     buildGraph()
-    //   }
-    // }
-    // else{
-      console.log("DONE!");
-      // console.log("G: nodes="+g.nodes().length+" edges="+g.edges().length);
-      console.log("Total nodes: "+Object.keys(BTCNodes).length);
-      process.exit(0);
-    // }
-  });
+/* Handle final event */
+eventEmitter.on('done', function(){
+  //   if(--rounds > 0){
+  //     buildGraph()
+  //   }
+  // else{
+    console.log("DONE!");
+    console.log("Total nodes: "+Object.keys(BTCNodes).length);
+    // console.log("G: nodes="+g.nodes().length+" edges="+g.edges().length);
+    process.exit(0);
+  // }
+});
